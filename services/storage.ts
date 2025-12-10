@@ -6,24 +6,32 @@ const DB_KEY = 'mathWhiz_db_scores';
 // --- Database Simulation (LocalStorage) ---
 
 export const saveScore = (result: GameResult): void => {
-  const currentHistory = getAllScores();
-  const updatedHistory = [...currentHistory, result];
-  localStorage.setItem(DB_KEY, JSON.stringify(updatedHistory));
+  try {
+    const currentHistory = getAllScores();
+    const updatedHistory = [...currentHistory, result];
+    localStorage.setItem(DB_KEY, JSON.stringify(updatedHistory));
+  } catch (e) {
+    console.error("Failed to save score to storage", e);
+  }
 };
 
 export const getAllScores = (): GameResult[] => {
-  const stored = localStorage.getItem(DB_KEY);
-  if (!stored) return [];
   try {
+    const stored = localStorage.getItem(DB_KEY);
+    if (!stored) return [];
     return JSON.parse(stored);
   } catch (e) {
-    console.error("Failed to parse scores", e);
+    console.error("Failed to access/parse scores from storage", e);
     return [];
   }
 };
 
 export const clearScores = (): void => {
-  localStorage.removeItem(DB_KEY);
+  try {
+    localStorage.removeItem(DB_KEY);
+  } catch (e) {
+    console.error("Failed to clear storage", e);
+  }
 };
 
 // --- URL Sharing Logic ---
@@ -45,12 +53,12 @@ export const generateAssignmentLink = (studentName: string, settings: GameSettin
 };
 
 export const parseAssignmentFromUrl = (): AssignmentData | null => {
-  const params = new URLSearchParams(window.location.search);
-  const assignmentToken = params.get('assignment');
-
-  if (!assignmentToken) return null;
-
   try {
+    const params = new URLSearchParams(window.location.search);
+    const assignmentToken = params.get('assignment');
+
+    if (!assignmentToken) return null;
+
     const jsonStr = atob(assignmentToken);
     const data = JSON.parse(jsonStr) as AssignmentData;
     return data;
