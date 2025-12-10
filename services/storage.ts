@@ -1,32 +1,70 @@
-
 import { GameResult, AssignmentData, GameSettings } from '../types';
+import { db, isFirebaseConfigured } from './firebase';
+import { collection, addDoc, getDocs, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 
 const DB_KEY = 'mathWhiz_db_scores';
 
-// --- Database Simulation (LocalStorage) ---
+// --- Database Operations ---
 
-export const saveScore = (result: GameResult): void => {
+export const saveScore = async (result: GameResult): Promise<void> => {
+  // 1. Always save to LocalStorage (as a backup/cache for the student)
   try {
-    const currentHistory = getAllScores();
-    const updatedHistory = [...currentHistory, result];
-    localStorage.setItem(DB_KEY, JSON.stringify(updatedHistory));
+    const currentLocal = getLocalScores();
+    const updatedLocal = [...currentLocal, result];
+    localStorage.setItem(DB_KEY, JSON.stringify(updatedLocal));
   } catch (e) {
-    console.error("Failed to save score to storage", e);
+    console.error("Local save failed", e);
+  }
+
+  // 2. If Firebase is configured, save to Cloud
+  if (isFirebaseConfigured && db) {
+    try {
+      await addDoc(collection(db, "scores"), {
+        ...result,
+        timestamp: Timestamp.now() // Add server timestamp for better sorting
+      });
+    } catch (e) {
+      console.error("Firebase save failed", e);
+      // We don't throw here so the app doesn't crash for the student
+    }
   }
 };
 
-export const getAllScores = (): GameResult[] => {
+export const getScores = async (): Promise<GameResult[]> => {
+  // If Firebase is on, try to fetch global scores (for Teacher View mainly)
+  // Note: For students, we might only want to show THEIR scores, but for now we follow the structure
+  if (isFirebaseConfigured && db) {
+    try {
+      const q = query(collection(db, "scores"), orderBy("timestamp", "desc"), limit(100));
+      const querySnapshot = await getDocs(q);
+      const scores: GameResult[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Convert Firestore Timestamp back to ISO string if needed, or rely on original date string
+        scores.push(data as GameResult);
+      });
+      return scores;
+    } catch (e) {
+      console.error("Firebase fetch failed, falling back to local", e);
+    }
+  }
+
+  // Fallback to local
+  return getLocalScores().reverse();
+};
+
+// Synchronous helper for local storage only
+const getLocalScores = (): GameResult[] => {
   try {
     const stored = localStorage.getItem(DB_KEY);
     if (!stored) return [];
     return JSON.parse(stored);
   } catch (e) {
-    console.error("Failed to access/parse scores from storage", e);
     return [];
   }
 };
 
-export const clearScores = (): void => {
+export const clearLocalScores = (): void => {
   try {
     localStorage.removeItem(DB_KEY);
   } catch (e) {
@@ -35,20 +73,13 @@ export const clearScores = (): void => {
 };
 
 // --- URL Sharing Logic ---
-
+// This remains synchronous and client-side as it just encodes JSON
 export const generateAssignmentLink = (studentName: string, settings: GameSettings): string => {
   const data: AssignmentData = { studentName, settings };
-  // Encode to Base64 to make it URL safe(ish) and obscure slightly
   const jsonStr = JSON.stringify(data);
   const encoded = btoa(jsonStr);
-  
-  // Robust base URL retrieval: Use href and strip query params
-  // This prevents issues where origin/pathname concatenation might duplicate protocols in some envs
   const baseUrl = window.location.href.split('?')[0];
-  
-  // Ensure we don't have a double slash issue if baseUrl ends with /
   const separator = baseUrl.includes('?') ? '&' : '?';
-  
   return `${baseUrl}${separator}assignment=${encoded}`;
 };
 
@@ -56,14 +87,10 @@ export const parseAssignmentFromUrl = (): AssignmentData | null => {
   try {
     const params = new URLSearchParams(window.location.search);
     const assignmentToken = params.get('assignment');
-
     if (!assignmentToken) return null;
-
     const jsonStr = atob(assignmentToken);
-    const data = JSON.parse(jsonStr) as AssignmentData;
-    return data;
+    return JSON.parse(jsonStr) as AssignmentData;
   } catch (e) {
-    console.error("Failed to parse assignment token", e);
     return null;
   }
 };

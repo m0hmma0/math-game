@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { GameMode, GameResult, GameSettings } from '../types';
-import { getAllScores, generateAssignmentLink, clearScores } from '../services/storage';
-import { LogOut, Link as LinkIcon, Trash2, Check, Copy, Lock, AlertCircle, Clock, ListFilter } from 'lucide-react';
+import { getScores, generateAssignmentLink, clearLocalScores } from '../services/storage';
+import { isFirebaseConfigured } from '../services/firebase';
+import { LogOut, Link as LinkIcon, Trash2, Check, Copy, Lock, AlertCircle, Clock, ListFilter, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 
 interface TeacherDashboardProps {
   onLogout: () => void;
@@ -17,7 +17,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) 
   // Login Logic
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Case-insensitive check and trim whitespace for better user experience
     if (password.trim().toLowerCase() === 'admin') {
       setIsAuthenticated(true);
       setError('');
@@ -75,7 +74,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) 
       <div className="flex justify-between items-center mb-8 pb-6 border-b border-gray-100">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Teacher Dashboard</h1>
-          <p className="text-gray-500">Manage classroom progress</p>
+          <p className="text-gray-500 flex items-center gap-2">
+            Manage classroom progress
+            {isFirebaseConfigured ? (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1 font-bold"><Cloud size={12}/> Cloud Active</span>
+            ) : (
+              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full flex items-center gap-1 font-bold"><CloudOff size={12}/> Local Mode</span>
+            )}
+          </p>
         </div>
         <button onClick={onLogout} className="flex items-center gap-2 text-red-500 font-bold hover:bg-red-50 px-4 py-2 rounded-lg transition-colors">
           <LogOut size={18} /> Logout
@@ -107,29 +113,46 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) 
 
 const ScoresView: React.FC = () => {
   const [scores, setScores] = useState<GameResult[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchScores = async () => {
+    setLoading(true);
+    const data = await getScores();
+    setScores(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    setScores(getAllScores().reverse()); // Newest first
+    fetchScores();
   }, []);
 
-  const handleClear = () => {
-    if (confirm("Are you sure you want to delete all student scores?")) {
-      clearScores();
-      setScores([]);
+  const handleClearLocal = () => {
+    if (confirm("This only clears LOCAL browser history, not the database. Continue?")) {
+      clearLocalScores();
+      fetchScores();
     }
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={handleClear} className="text-red-400 text-sm hover:text-red-600 flex items-center gap-1">
-          <Trash2 size={14} /> Clear History
+      <div className="flex justify-end gap-2">
+        <button onClick={fetchScores} className="text-brand-blue text-sm hover:underline flex items-center gap-1">
+          <RefreshCw size={14} /> Refresh
         </button>
+        {!isFirebaseConfigured && (
+          <button onClick={handleClearLocal} className="text-red-400 text-sm hover:text-red-600 flex items-center gap-1">
+            <Trash2 size={14} /> Clear Local History
+          </button>
+        )}
       </div>
       
-      {scores.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center py-20 text-brand-blue">
+          <RefreshCw className="animate-spin" size={32} />
+        </div>
+      ) : scores.length === 0 ? (
         <div className="text-center py-20 text-gray-400 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-          No scores recorded yet.
+          No scores found.
         </div>
       ) : (
         <div className="overflow-x-auto">

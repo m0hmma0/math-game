@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { SetupScreen } from './components/SetupScreen';
 import { GameScreen } from './components/GameScreen';
@@ -6,7 +5,7 @@ import { ScoreScreen } from './components/ScoreScreen';
 import { LandingScreen } from './components/LandingScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { GameSettings, GameResult } from './types';
-import { saveScore, getAllScores, parseAssignmentFromUrl } from './services/storage';
+import { saveScore, getScores, parseAssignmentFromUrl } from './services/storage';
 
 enum AppState {
   LANDING,
@@ -14,7 +13,7 @@ enum AppState {
   TEACHER,
   PLAYING,
   SCORE,
-  ASSIGNMENT_READY // New state for when arriving via link
+  ASSIGNMENT_READY
 }
 
 const App: React.FC = () => {
@@ -24,11 +23,8 @@ const App: React.FC = () => {
   const [resultsHistory, setResultsHistory] = useState<GameResult[]>([]);
   const [studentName, setStudentName] = useState('');
 
-  // Initial Load: Check for URL Assignment or Local History
+  // Initial Load
   useEffect(() => {
-    // Load history
-    setResultsHistory(getAllScores());
-
     // Check for assignment link
     const assignment = parseAssignmentFromUrl();
     if (assignment) {
@@ -36,7 +32,15 @@ const App: React.FC = () => {
       setCurrentSettings(assignment.settings);
       setAppState(AppState.ASSIGNMENT_READY);
     }
+
+    // Load history asynchronously
+    loadHistory();
   }, []);
+
+  const loadHistory = async () => {
+    const history = await getScores();
+    setResultsHistory(history);
+  };
 
   const handleNameEntry = (name: string) => {
     setStudentName(name);
@@ -58,20 +62,20 @@ const App: React.FC = () => {
     }
   };
 
-  const finishGame = (result: GameResult) => {
+  const finishGame = async (result: GameResult) => {
     // Augment result with student name
     const finalResult = { ...result, studentName };
     setCurrentResult(finalResult);
+    setAppState(AppState.SCORE); // Show score immediately for better UX
     
-    // Save to persistence layer
-    saveScore(finalResult);
-    setResultsHistory(getAllScores());
+    // Save to persistence layer in background
+    await saveScore(finalResult);
     
-    setAppState(AppState.SCORE);
+    // Refresh history
+    await loadHistory();
   };
 
   const goHome = () => {
-    // Clear URL params if we go home to prevent loop
     if (window.location.search) {
       window.history.pushState({}, document.title, window.location.pathname);
     }
@@ -102,7 +106,7 @@ const App: React.FC = () => {
 
       {appState === AppState.ASSIGNMENT_READY && currentSettings && (
         <div className="flex h-full items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md text-center border-4 border-brand-yellow">
+          <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md text-center border-4 border-brand-yellow animate-fade-in">
             <div className="text-6xl mb-4">🎁</div>
             <h2 className="text-3xl font-black text-brand-blue mb-2">Special Mission!</h2>
             <p className="text-gray-500 text-lg mb-8">
