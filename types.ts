@@ -49,6 +49,7 @@ export interface GameResult {
   date: string;
   mode: GameMode;
   retryCount: number;
+  completed?: boolean; // New flag to track if game was finished or abandoned
   history: {
     question: Question;
     userAnswer: string;

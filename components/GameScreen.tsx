@@ -9,10 +9,10 @@ import { Timer, HelpCircle, ArrowRight, CheckCircle2, XCircle, Wrench } from 'lu
 interface GameScreenProps {
   settings: GameSettings;
   onFinish: (result: GameResult) => void;
-  onExit: () => void;
+  onAbandon: (result: GameResult) => void;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ settings, onFinish, onExit }) => {
+export const GameScreen: React.FC<GameScreenProps> = ({ settings, onFinish, onAbandon }) => {
   // Game State
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -192,13 +192,30 @@ export const GameScreen: React.FC<GameScreenProps> = ({ settings, onFinish, onEx
   const finishGameWithRetries = () => {
     const finalHistory = historyRef.current;
     const score = finalHistory.filter(h => h.isCorrect).length;
+    // @ts-ignore - studentName added in App.tsx
     onFinish({
       score,
       totalQuestions: questions.length,
       date: new Date().toISOString(),
       mode: settings.mode,
       retryCount: totalRetryAttempts,
-      history: finalHistory
+      history: finalHistory,
+      completed: true
+    });
+  };
+
+  const handleExit = () => {
+    const finalHistory = historyRef.current;
+    const score = finalHistory.filter(h => h.isCorrect).length;
+    // @ts-ignore - studentName added in App.tsx
+    onAbandon({
+      score,
+      totalQuestions: questions.length,
+      date: new Date().toISOString(),
+      mode: settings.mode,
+      retryCount: totalRetryAttempts,
+      history: finalHistory,
+      completed: false
     });
   };
 
@@ -237,7 +254,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ settings, onFinish, onEx
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative z-10">
-        <button onClick={onExit} className="text-gray-400 hover:text-red-500 font-bold text-sm">EXIT</button>
+        <button onClick={handleExit} className="text-gray-400 hover:text-red-500 font-bold text-sm">EXIT</button>
         <div className="flex items-center gap-2 font-mono text-xl text-brand-blue font-bold">
            {isRetryMode ? (
              <span className="flex items-center gap-2 text-orange-500">

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { SetupScreen } from './components/SetupScreen';
 import { GameScreen } from './components/GameScreen';
@@ -75,6 +76,14 @@ const App: React.FC = () => {
     await loadHistory();
   };
 
+  const handleAbandon = async (result: GameResult) => {
+    // Save incomplete game and return home
+    const finalResult = { ...result, studentName };
+    await saveScore(finalResult);
+    await loadHistory();
+    goHome();
+  };
+
   const goHome = () => {
     if (window.location.search) {
       window.history.pushState({}, document.title, window.location.pathname);
@@ -134,7 +143,7 @@ const App: React.FC = () => {
         <GameScreen 
           settings={currentSettings} 
           onFinish={finishGame} 
-          onExit={goHome} 
+          onAbandon={handleAbandon}
         />
       )}
       

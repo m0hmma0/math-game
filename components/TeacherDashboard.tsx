@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { GameMode, GameResult, GameSettings } from '../types';
 import { getScores, generateAssignmentLink, clearLocalScores } from '../services/storage';
 import { isFirebaseConfigured } from '../services/firebase';
-import { LogOut, Link as LinkIcon, Trash2, Check, Copy, Lock, AlertCircle, Clock, ListFilter, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { LogOut, Link as LinkIcon, Trash2, Check, Copy, Lock, AlertCircle, Clock, ListFilter, Cloud, CloudOff, RefreshCw, XCircle } from 'lucide-react';
 
 interface TeacherDashboardProps {
   onLogout: () => void;
@@ -163,6 +164,7 @@ const ScoresView: React.FC = () => {
                 <th className="p-3 font-bold uppercase">Student</th>
                 <th className="p-3 font-bold uppercase">Mode</th>
                 <th className="p-3 font-bold uppercase text-center">Score</th>
+                <th className="p-3 font-bold uppercase text-center">Status</th>
                 <th className="p-3 font-bold uppercase text-center">Retries</th>
               </tr>
             </thead>
@@ -186,6 +188,17 @@ const ScoresView: React.FC = () => {
                     <span className={`font-bold ${s.score === s.totalQuestions ? 'text-green-600' : 'text-gray-800'}`}>
                       {s.score}/{s.totalQuestions}
                     </span>
+                  </td>
+                   <td className="p-3 text-center">
+                    {s.completed === false ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-red-500 bg-red-100 px-2 py-1 rounded-full">
+                        <XCircle size={12}/> Incomplete
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        <Check size={12}/> Finished
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-center text-gray-500">
                     {s.retryCount > 0 ? <span className="text-orange-500 font-bold">{s.retryCount}</span> : '-'}
