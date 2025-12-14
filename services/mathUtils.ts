@@ -5,14 +5,13 @@ const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max 
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Helper to calculate GCD for simplifying fractions (though user input checks might not require strict simplification unless specified)
+// Helper to calculate GCD for simplifying fractions
 const gcd = (a: number, b: number): number => {
   return b === 0 ? a : gcd(b, a % b);
 };
 
 const getSignature = (q: Question): string => {
   if (q.type === GameMode.TIMES_TABLES) {
-    // 2x3 is same as 3x2? Usually times tables treat them distinctly in learning, but let's treat them as distinct for now.
     return `${q.data.val1}x${q.data.val2}`;
   } else if (q.type === GameMode.FRACTIONS_OPS) {
     return `${q.data.fraction1?.num}/${q.data.fraction1?.den}${q.data.operator}${q.data.fraction2?.num}/${q.data.fraction2?.den}`;
@@ -38,10 +37,10 @@ export const generateQuestions = (settings: GameSettings): Question[] => {
         q = generateTimesTableQuestion(settings.selectedTables);
         break;
       case GameMode.FRACTIONS_OPS:
-        q = generateFractionOpQuestion(settings.fractionOps);
+        q = generateFractionOpQuestion(settings);
         break;
       case GameMode.MIXED_TO_IMPROPER:
-        q = generateMixedToImproperQuestion();
+        q = generateMixedToImproperQuestion(settings);
         break;
     }
 
@@ -79,19 +78,30 @@ const generateTimesTableQuestion = (tables: number[]): Question => {
   };
 };
 
-const generateFractionOpQuestion = (ops: ('add' | 'sub' | 'mul' | 'div')[]): Question => {
+const generateFractionOpQuestion = (settings: GameSettings): Question => {
+  const ops = settings.fractionOps;
   const op = ops.length > 0 ? ops[randomInt(0, ops.length - 1)] : 'add';
   
-  // Keep denominators simple for primary students (2, 3, 4, 5, 6, 8, 10)
-  const dens = [2, 3, 4, 5, 6, 8, 10];
-  const d1 = dens[randomInt(0, dens.length - 1)];
-  const d2 = dens[randomInt(0, dens.length - 1)];
+  // Use selected denominators or fallback
+  const dens = settings.selectedDenominators && settings.selectedDenominators.length > 0 
+    ? settings.selectedDenominators 
+    : [2, 3, 4, 5, 6, 8, 10, 12];
   
-  const n1 = randomInt(1, d1 - 1);
-  const n2 = randomInt(1, d2 - 1);
+  // Generate "Like Fractions" (same denominator)
+  const commonDen = dens[randomInt(0, dens.length - 1)];
+  const d1 = commonDen;
+  const d2 = commonDen;
+  
+  // Numerators
+  let n1 = randomInt(1, d1 - 1);
+  let n2 = randomInt(1, d2 - 1);
+  
+  // Ensure n1/d1 is not 0 (though randomInt(1,...) handles this)
+  if (n1 < 1) n1 = 1;
+  if (n2 < 1) n2 = 1;
 
-  const f1: Fraction = { num: n1, den: d1 };
-  const f2: Fraction = { num: n2, den: d2 };
+  let f1: Fraction = { num: n1, den: d1 };
+  let f2: Fraction = { num: n2, den: d2 };
 
   let ansNum = 0;
   let ansDen = 1;
@@ -100,29 +110,33 @@ const generateFractionOpQuestion = (ops: ('add' | 'sub' | 'mul' | 'div')[]): Que
   switch (op) {
     case 'add':
       operatorSymbol = '+';
-      // n1/d1 + n2/d2 = (n1*d2 + n2*d1) / (d1*d2)
-      ansNum = n1 * d2 + n2 * d1;
-      ansDen = d1 * d2;
+      // Like fractions addition: (n1 + n2) / d
+      ansNum = n1 + n2;
+      ansDen = d1;
       break;
     case 'sub':
       operatorSymbol = '-';
       // Ensure positive result for primary students
-      if (n1/d1 < n2/d2) {
-        // Swap
-        return generateFractionOpQuestion(ops);
+      if (n1 < n2) {
+        // Swap values so larger is first
+        [n1, n2] = [n2, n1];
+        f1 = { num: n1, den: d1 };
+        f2 = { num: n2, den: d2 };
       }
-      ansNum = n1 * d2 - n2 * d1;
-      ansDen = d1 * d2;
+      ansNum = n1 - n2;
+      ansDen = d1;
       break;
     case 'mul':
       operatorSymbol = '×';
+      // Multiply: (n1 * n2) / (d * d)
       ansNum = n1 * n2;
       ansDen = d1 * d2;
       break;
     case 'div':
       operatorSymbol = '÷';
-      ansNum = n1 * d2;
-      ansDen = d1 * n2;
+      // Division: (n1/d) / (n2/d) = n1/n2
+      ansNum = n1;
+      ansDen = n2;
       break;
   }
 
@@ -131,7 +145,7 @@ const generateFractionOpQuestion = (ops: ('add' | 'sub' | 'mul' | 'div')[]): Que
   
   return {
     id: generateId(),
-    text: `${n1}/${d1} ${operatorSymbol} ${n2}/${d2}`,
+    text: `${f1.num}/${f1.den} ${operatorSymbol} ${f2.num}/${f2.den}`,
     type: GameMode.FRACTIONS_OPS,
     data: {
       fraction1: f1,
@@ -145,9 +159,14 @@ const generateFractionOpQuestion = (ops: ('add' | 'sub' | 'mul' | 'div')[]): Que
   };
 };
 
-const generateMixedToImproperQuestion = (): Question => {
-  const whole = randomInt(1, 5);
-  const dens = [2, 3, 4, 5, 6, 8];
+const generateMixedToImproperQuestion = (settings: GameSettings): Question => {
+  const wholeMax = settings.maxWholeNumber || 5;
+  const whole = randomInt(1, wholeMax);
+  
+  const dens = settings.selectedDenominators && settings.selectedDenominators.length > 0 
+    ? settings.selectedDenominators 
+    : [2, 3, 4, 5, 6, 8];
+    
   const den = dens[randomInt(0, dens.length - 1)];
   const num = randomInt(1, den - 1);
 

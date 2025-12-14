@@ -11,6 +11,8 @@ export interface GameSettings {
   timeLimitSeconds: number; // 0 for no limit
   selectedTables: number[]; // For times tables (2-12)
   fractionOps: ('add' | 'sub' | 'mul' | 'div')[];
+  selectedDenominators?: number[]; // For fractions/mixed
+  maxWholeNumber?: number; // For mixed numbers
 }
 
 export interface Question {

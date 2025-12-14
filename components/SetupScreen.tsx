@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { GameMode, GameSettings, GameResult } from '../types';
-import { Play, RotateCcw, Award, User } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Play, User, Award, Check } from 'lucide-react';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface SetupScreenProps {
   onStart: (settings: GameSettings) => void;
@@ -14,8 +14,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart, lastResults, 
   const [mode, setMode] = useState<GameMode>(GameMode.TIMES_TABLES);
   const [questionCount, setQuestionCount] = useState(10);
   const [timeLimit, setTimeLimit] = useState(0); // 0 = unlimited
+  
+  // Mode specific state
   const [selectedTables, setSelectedTables] = useState<number[]>([2, 3, 4, 5, 10]);
   const [ops, setOps] = useState<('add' | 'sub' | 'mul' | 'div')[]>(['add', 'sub']);
+  const [selectedDenominators, setSelectedDenominators] = useState<number[]>([2, 3, 4, 5, 8, 10]);
+  const [maxWholeNumber, setMaxWholeNumber] = useState(5);
 
   const toggleTable = (num: number) => {
     setSelectedTables(prev => 
@@ -25,6 +29,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart, lastResults, 
 
   const toggleOp = (op: 'add' | 'sub' | 'mul' | 'div') => {
     setOps(prev => prev.includes(op) ? prev.filter(o => o !== op) : [...prev, op]);
+  };
+
+  const toggleDenominator = (num: number) => {
+    setSelectedDenominators(prev => 
+      prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
+    );
   };
 
   const handleStart = () => {
@@ -37,23 +47,30 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart, lastResults, 
       alert("Please select at least one operation!");
       return;
     }
+    if ((mode === GameMode.FRACTIONS_OPS || mode === GameMode.MIXED_TO_IMPROPER) && selectedDenominators.length === 0) {
+      alert("Please select at least one denominator!");
+      return;
+    }
 
     onStart({
       mode,
       questionCount,
       timeLimitSeconds: timeLimit,
       selectedTables,
-      fractionOps: ops
+      fractionOps: ops,
+      selectedDenominators,
+      maxWholeNumber
     });
   };
 
-  // Prepare chart data (filter by student name if we were in a real DB, but here localstorage is per-browser)
-  // We'll just show all local history for the "Practice" mode context
+  // Prepare chart data
   const chartData = lastResults.slice(-5).map((r, i) => ({
     name: `Game ${i + 1}`,
     score: (r.score / r.totalQuestions) * 100,
     mode: r.mode === GameMode.TIMES_TABLES ? 'Tables' : r.mode === GameMode.FRACTIONS_OPS ? 'Fractions' : 'Mixed'
   }));
+
+  const availableDenominators = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20];
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-3xl shadow-xl mt-8 border-4 border-brand-lightBlue/30">
@@ -92,7 +109,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart, lastResults, 
             </div>
           </div>
 
-          {/* Specific Settings based on Mode */}
+          {/* Times Table Settings */}
           {mode === GameMode.TIMES_TABLES && (
             <div className="bg-brand-bg p-4 rounded-xl animate-fade-in">
               <label className="block text-brand-blue font-bold mb-3 uppercase tracking-wider text-sm">Select Tables</label>
@@ -110,10 +127,11 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart, lastResults, 
             </div>
           )}
 
+          {/* Fraction Ops Settings */}
           {mode === GameMode.FRACTIONS_OPS && (
             <div className="bg-brand-bg p-4 rounded-xl animate-fade-in">
               <label className="block text-brand-blue font-bold mb-3 uppercase tracking-wider text-sm">Operations</label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-6">
                 {[
                   { id: 'add', label: '+' },
                   { id: 'sub', label: '-' },
@@ -131,6 +149,47 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart, lastResults, 
               </div>
             </div>
           )}
+
+          {/* Shared Fraction/Mixed Settings: Denominators */}
+          {(mode === GameMode.FRACTIONS_OPS || mode === GameMode.MIXED_TO_IMPROPER) && (
+            <div className="bg-brand-bg p-4 rounded-xl animate-fade-in">
+              <label className="block text-brand-blue font-bold mb-3 uppercase tracking-wider text-sm">Select Denominators</label>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {availableDenominators.map(num => (
+                  <button
+                    key={num}
+                    onClick={() => toggleDenominator(num)}
+                    className={`w-10 h-10 rounded-lg font-bold transition-transform active:scale-95 ${selectedDenominators.includes(num) ? 'bg-purple-500 text-white shadow-lg scale-110' : 'bg-white text-gray-500'}`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Select All / Clear */}
+               <div className="flex gap-2">
+                 <button onClick={() => setSelectedDenominators(availableDenominators)} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold text-gray-600">All</button>
+                 <button onClick={() => setSelectedDenominators([2, 4, 5, 10])} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold text-gray-600">Simple</button>
+               </div>
+            </div>
+          )}
+          
+          {/* Mixed Numbers Specific: Whole Number Range */}
+          {mode === GameMode.MIXED_TO_IMPROPER && (
+             <div className="bg-brand-bg p-4 rounded-xl animate-fade-in">
+               <label className="block text-brand-blue font-bold mb-3 uppercase tracking-wider text-sm">Max Whole Number</label>
+               <div className="flex items-center gap-4">
+                 <input 
+                   type="range" min="1" max="20" step="1" 
+                   value={maxWholeNumber} 
+                   onChange={(e) => setMaxWholeNumber(Number(e.target.value))}
+                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-green"
+                 />
+                 <span className="font-bold text-2xl text-brand-green w-12 text-center">{maxWholeNumber}</span>
+               </div>
+             </div>
+          )}
+
         </div>
 
         <div className="space-y-6">

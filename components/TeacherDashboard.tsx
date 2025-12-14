@@ -221,6 +221,10 @@ const CreateAssignmentView: React.FC = () => {
   const [selectedTables, setSelectedTables] = useState<number[]>([2, 3, 4, 5, 10]);
   const [ops, setOps] = useState<('add' | 'sub' | 'mul' | 'div')[]>(['add', 'sub']);
   
+  // New States for customization
+  const [selectedDenominators, setSelectedDenominators] = useState<number[]>([2, 3, 4, 5, 8, 10]);
+  const [maxWholeNumber, setMaxWholeNumber] = useState(5);
+  
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -233,18 +237,27 @@ const CreateAssignmentView: React.FC = () => {
   const toggleOp = (op: 'add' | 'sub' | 'mul' | 'div') => {
     setOps(prev => prev.includes(op) ? prev.filter(o => o !== op) : [...prev, op]);
   };
+  
+  const toggleDenominator = (num: number) => {
+    setSelectedDenominators(prev => 
+      prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
+    );
+  };
 
   const createLink = () => {
     if (!studentName) { alert('Enter a student name'); return; }
     if (mode === GameMode.TIMES_TABLES && selectedTables.length === 0) { alert('Select at least one table'); return; }
     if (mode === GameMode.FRACTIONS_OPS && ops.length === 0) { alert('Select at least one operation'); return; }
+    if ((mode === GameMode.FRACTIONS_OPS || mode === GameMode.MIXED_TO_IMPROPER) && selectedDenominators.length === 0) { alert('Select at least one denominator'); return; }
     
     const settings: GameSettings = {
       mode,
       questionCount: count,
       timeLimitSeconds: timeLimit,
       selectedTables,
-      fractionOps: ops
+      fractionOps: ops,
+      selectedDenominators,
+      maxWholeNumber
     };
 
     const link = generateAssignmentLink(studentName, settings);
@@ -257,6 +270,8 @@ const CreateAssignmentView: React.FC = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const availableDenominators = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -285,22 +300,6 @@ const CreateAssignmentView: React.FC = () => {
                 </button>
               ))}
            </div>
-        </div>
-
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="text-gray-700 font-bold flex items-center gap-2"><ListFilter size={16}/> Questions</label>
-            <span className="font-bold text-brand-blue">{count}</span>
-          </div>
-          <input type="range" min="5" max="30" step="5" value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-full accent-brand-blue" />
-        </div>
-
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="text-gray-700 font-bold flex items-center gap-2"><Clock size={16}/> Time Limit (Sec)</label>
-            <span className="font-bold text-brand-blue">{timeLimit === 0 ? 'No Limit' : `${timeLimit}s`}</span>
-          </div>
-          <input type="range" min="0" max="300" step="30" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value))} className="w-full accent-brand-blue" />
         </div>
 
         {mode === GameMode.TIMES_TABLES && (
@@ -341,6 +340,45 @@ const CreateAssignmentView: React.FC = () => {
             </div>
           </div>
         )}
+
+        {(mode === GameMode.FRACTIONS_OPS || mode === GameMode.MIXED_TO_IMPROPER) && (
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+            <label className="block text-gray-700 font-bold mb-2 text-sm uppercase">Denominators</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {availableDenominators.map(num => (
+                <button
+                  key={num}
+                  onClick={() => toggleDenominator(num)}
+                  className={`w-8 h-8 text-sm rounded-lg font-bold transition-all ${selectedDenominators.includes(num) ? 'bg-purple-500 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200'}`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+             {mode === GameMode.MIXED_TO_IMPROPER && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                    <label className="block text-gray-700 font-bold mb-2 text-sm uppercase">Max Whole Number: {maxWholeNumber}</label>
+                    <input type="range" min="1" max="20" step="1" value={maxWholeNumber} onChange={(e) => setMaxWholeNumber(Number(e.target.value))} className="w-full accent-brand-green" />
+                </div>
+            )}
+          </div>
+        )}
+
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-gray-700 font-bold flex items-center gap-2"><ListFilter size={16}/> Questions</label>
+            <span className="font-bold text-brand-blue">{count}</span>
+          </div>
+          <input type="range" min="5" max="30" step="5" value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-full accent-brand-blue" />
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-gray-700 font-bold flex items-center gap-2"><Clock size={16}/> Time Limit (Sec)</label>
+            <span className="font-bold text-brand-blue">{timeLimit === 0 ? 'No Limit' : `${timeLimit}s`}</span>
+          </div>
+          <input type="range" min="0" max="300" step="30" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value))} className="w-full accent-brand-blue" />
+        </div>
 
         <button 
           onClick={createLink}
